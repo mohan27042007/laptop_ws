@@ -1,0 +1,21 @@
+# ROS 2 build artifacts
+build/
+install/
+log/
+
+# Python cache
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Colcon metadata
+.colcon/
+
+# VSCode settings (optional)
+.vscode/
+
+# JetBrains IDE settings (optional)
+.idea/
+
+# MacOS junk (if any)
+.DS_Store
