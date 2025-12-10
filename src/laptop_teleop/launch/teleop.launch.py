@@ -9,6 +9,5 @@ def generate_launch_description():
             executable='custom_teleop',
             name='teleop_key',
             output='screen',
-            prefix='xterm -e',  # opens in its own terminal
         )
     ])

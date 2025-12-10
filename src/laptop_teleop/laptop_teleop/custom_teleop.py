@@ -48,7 +48,7 @@ def main():
 
     rclpy.init()
     node = rclpy.create_node('custom_teleop')
-    pub = node.create_publisher(Twist, 'cmd_vel', 10)
+    pub = node.create_publisher(Twist, '/cmd_vel', 10)
 
     speed = 0.5
     turn = 1.0
