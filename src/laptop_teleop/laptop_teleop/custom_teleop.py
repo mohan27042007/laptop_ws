@@ -68,13 +68,16 @@ def main():
                 y = moveBindings[key][1]
                 z = moveBindings[key][2]
                 th = moveBindings[key][3]
-            elif key in speedBindings.keys():
-                speed = speed * speedBindings[key][0]
-                turn = turn * speedBindings[key][1]
+            elif key == 'q':
+                speed = min(speed + 0.1, 1.5)
+                turn  = min(turn  + 0.1, 2.0)
                 print(f"currently:\tspeed {speed}\tturn {turn}")
-                if (status == 14):
-                    print(msg)
-                status = (status + 1) % 15
+
+            elif key == 'z':
+                speed = max(speed - 0.1, 0.0)
+                turn  = max(turn  - 0.1, 0.0)
+                print(f"currently:\tspeed {speed}\tturn {turn}")
+
             else:
                 x = 0
                 y = 0
