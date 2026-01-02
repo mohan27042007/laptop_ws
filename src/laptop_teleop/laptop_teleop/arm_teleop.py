@@ -7,12 +7,13 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 msg = """
-Arm Control Keys:
---------------------------
+Arm Control Keys (360 BUCKET TEMP MODE):
+---------------------------------------
 u / j = joint up / down
-i / k = bucket up / down
+i     = bucket UP (pulse)
+k     = bucket DOWN (pulse)
+x     = STOP bucket + reset joint
 
-x = reset (joint=0, bucket=0)
 CTRL+C to quit
 """
 
@@ -27,8 +28,8 @@ class ArmTeleop(Node):
         super().__init__('arm_teleop')
         self.pub = self.create_publisher(String, '/arm_command', 10)
 
-        self.joint = 90
-        self.bucket = 90
+        self.joint = 20   # match Arduino JOINT_MIN
+        self.bucket = 0  # 0 = STOP
 
     def send(self):
         msg = String()
@@ -47,24 +48,30 @@ def main():
         while True:
             key = getKey(settings)
 
-            if key == 'u': node.joint += 5
-            elif key == 'j': node.joint -= 5
+            if key == 'u':
+                node.joint += 5
+                node.bucket = 0
 
-            elif key == 'i': node.bucket += 5
-            elif key == 'k': node.bucket -= 5
+            elif key == 'j':
+                node.joint -= 5
+                node.bucket = 0
+
+            elif key == 'i':
+                node.bucket = 1  # UP
+
+            elif key == 'k':
+                node.bucket = 2  # DOWN
 
             elif key == 'x':
-                node.joint = 0
                 node.bucket = 0
+                node.joint = 20
 
             else:
                 if key == '\x03':
                     break
+                continue
 
-            # Constrain values
-            node.joint = max(0, min(180, node.joint))
-            node.bucket = max(0, min(180, node.bucket))
-
+            node.joint = max(20, min(150, node.joint))
             node.send()
 
     finally:

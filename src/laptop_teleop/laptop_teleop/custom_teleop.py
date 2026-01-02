@@ -13,28 +13,33 @@ Moving around:
         w
    a    s    d
 
+
 q/z : increase/decrease max speeds by 10%
 x   : force stop
 
+
 w : move forward
 s : move backward
-a : turn left
-d : turn right
+a : SPIN left (In-Place)
+d : SPIN right (In-Place)
+
 
 CTRL-C to quit
 """
 
+# For a non-holonomic skid-steer/differential drive, only linear.x and angular.z are used.
+# w/s: forward/backward, a/d: pure spin in place.
 moveBindings = {
-    'w': (1, 0, 0, 0),
-    's': (-1, 0, 0, 0),
-    'a': (0, 0, 0, 1),
-    'd': (0, 0, 0, -1),
-    'x': (0, 0, 0, 0),
+    'w': (1, 0, 0, 0),   # forward
+    's': (-1, 0, 0, 0),  # backward
+    'a': (0, 0, 0, 1),   # spin left
+    'd': (0, 0, 0, -1),  # spin right
+    'x': (0, 0, 0, 0),   # stop
 }
 
 speedBindings = {
-    'q': (1.1, 1.1),
-    'z': (0.9, 0.9),
+    'q': (1.1, 1.1),     # increase both linear and angular limits by 10%
+    'z': (0.9, 0.9),     # decrease both by 10%
 }
 
 def getKey(settings):
@@ -48,48 +53,52 @@ def main():
 
     rclpy.init()
     node = rclpy.create_node('custom_teleop')
-    pub = node.create_publisher(Twist, '/cmd_vel', 10)
+    pub = node.create_publisher(Twist, '/cmd_vel_teleop', 10)
 
-    speed = 0.5
-    turn = 1.0
+    speed = 0.5      # max linear speed (m/s)
+    turn = 2.0       # max angular speed (rad/s)
     x = 0
     y = 0
     z = 0
     th = 0
-    status = 0
 
     try:
         print(msg)
         print(f"currently:\tspeed {speed}\tturn {turn}")
         while True:
             key = getKey(settings)
+
             if key in moveBindings.keys():
-                x = moveBindings[key][0]
-                y = moveBindings[key][1]
-                z = moveBindings[key][2]
-                th = moveBindings[key][3]
+                x, y, z, th = moveBindings[key]
+                if key == 'x':
+                    # explicit emergency stop
+                    speed = 0.0
+                    turn = 0.0
+                    print(f"EMERGENCY STOP: speed {speed}\tturn {turn}")
+
             elif key == 'q':
-                speed = min(speed + 0.1, 1.5)
-                turn  = min(turn  + 0.1, 2.0)
+                speed = min(speed * speedBindings['q'][0], 1.5)
+                turn  = min(turn  * speedBindings['q'][1], 3.0)
                 print(f"currently:\tspeed {speed}\tturn {turn}")
 
             elif key == 'z':
-                speed = max(speed - 0.1, 0.0)
-                turn  = max(turn  - 0.1, 0.0)
+                speed = max(speed * speedBindings['z'][0], 0.0)
+                turn  = max(turn  * speedBindings['z'][1], 0.0)
                 print(f"currently:\tspeed {speed}\tturn {turn}")
 
             else:
+                # any other key: stop motion
                 x = 0
                 y = 0
                 z = 0
                 th = 0
-                if (key == '\x03'):
+                if key == '\x03':  # CTRL-C
                     break
 
             twist = Twist()
-            twist.linear.x = x * speed
-            twist.linear.y = y * speed
-            twist.linear.z = z * speed
+            twist.linear.x  = x * speed
+            twist.linear.y  = 0.0
+            twist.linear.z  = 0.0
             twist.angular.x = 0.0
             twist.angular.y = 0.0
             twist.angular.z = th * turn
@@ -100,9 +109,9 @@ def main():
 
     finally:
         twist = Twist()
-        twist.linear.x = 0.0
-        twist.linear.y = 0.0
-        twist.linear.z = 0.0
+        twist.linear.x  = 0.0
+        twist.linear.y  = 0.0
+        twist.linear.z  = 0.0
         twist.angular.x = 0.0
         twist.angular.y = 0.0
         twist.angular.z = 0.0
