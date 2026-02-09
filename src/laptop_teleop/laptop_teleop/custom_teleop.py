@@ -6,7 +6,8 @@ import select
 import os
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+# CHANGE 1: Use TwistStamped
+from geometry_msgs.msg import TwistStamped
 
 msg = """
 Control Your Rover!
@@ -43,7 +44,9 @@ def main():
 
     rclpy.init()
     node = rclpy.create_node('custom_teleop')
-    pub = node.create_publisher(Twist, '/cmd_vel_teleop', 10)
+    
+    # CHANGE 2: Publish TwistStamped to the correct topic
+    pub = node.create_publisher(TwistStamped, '/cmd_vel_teleop', 10)
 
     speed = 0.5
     turn = 0.5
@@ -59,25 +62,39 @@ def main():
                 key = sys.stdin.read(1)
                 if key in moveBindings:
                     x, y, z, th = moveBindings[key]
-                    twist = Twist()
-                    twist.linear.x = float(x * speed)
-                    twist.angular.z = float(th * turn)
-                    pub.publish(twist)
+                    
+                    # CHANGE 3: Create Stamped Message
+                    t = TwistStamped()
+                    t.header.stamp = node.get_clock().now().to_msg()
+                    t.header.frame_id = "base_footprint"  # Valid Frame ID
+                    
+                    # Store velocity in the .twist sub-field
+                    t.twist.linear.x = float(x * speed)
+                    t.twist.angular.z = float(th * turn)
+                    
+                    pub.publish(t)
+                    
                 elif key in speedBindings:
                     speed = speed * speedBindings[key][0]
                     turn = turn * speedBindings[key][1]
                     print(f"currently:\tspeed {speed}\tturn {turn}\r")
+                    
                 elif key == 'x' or key == '\x03': # Stop or Ctrl-C
-                    pub.publish(Twist())
+                    # CHANGE 4: Stop with a valid stamped message
+                    stop_msg = TwistStamped()
+                    stop_msg.header.stamp = node.get_clock().now().to_msg()
+                    stop_msg.header.frame_id = "base_footprint"
+                    pub.publish(stop_msg)
                     if key == '\x03': break
             else:
-                # Optional: Publish stop if no key held? 
-                # Friend's code stays moving until 'x', so we do the same.
                 pass
 
     finally:
-        pub.publish(Twist())
+        # Final stop
+        stop_msg = TwistStamped()
+        stop_msg.header.frame_id = "base_footprint"
+        pub.publish(stop_msg)
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
 
 if __name__ == '__main__':
-    main()
+    main() 
