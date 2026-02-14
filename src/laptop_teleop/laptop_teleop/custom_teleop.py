@@ -3,14 +3,12 @@ import sys
 import termios
 import tty
 import select
-import os
 import rclpy
 from rclpy.node import Node
-# CHANGE 1: Use TwistStamped
 from geometry_msgs.msg import TwistStamped
 
 msg = """
-Control Your Rover!
+Control Your Rover! (CORRECTED BINDINGS)
 ---------------------------
 Moving around:
         w
@@ -28,10 +26,10 @@ CTRL-C to quit
 """
 
 moveBindings = {
-    'w': (-1, 0, 0, 0),
-    's': (1, 0, 0, 0),
-    'a': (0, 0, 0, -1),
-    'd': (0, 0, 0, 1),
+    'w': (1, 0, 0, 0),
+    's': (-1, 0, 0, 0),
+    'a': (0, 0, 0, 1),
+    'd': (0, 0, 0, -1),
 }
 
 speedBindings = {
@@ -39,62 +37,70 @@ speedBindings = {
     'z': (0.9, 0.9),
 }
 
+class TeleopNode(Node):
+    def __init__(self):
+        super().__init__('custom_teleop')
+        self.pub = self.create_publisher(TwistStamped, '/cmd_vel_teleop', 10)
+        self.settings = termios.tcgetattr(sys.stdin)
+
+    def publish_twist(self, x, th, speed, turn):
+        t = TwistStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = "base_footprint"
+        t.twist.linear.x = float(x * speed)
+        t.twist.angular.z = float(th * turn)
+        self.pub.publish(t)
+
 def main():
-    settings = termios.tcgetattr(sys.stdin)
-
     rclpy.init()
-    node = rclpy.create_node('custom_teleop')
+    teleop = TeleopNode()
     
-    # CHANGE 2: Publish TwistStamped to the correct topic
-    pub = node.create_publisher(TwistStamped, '/cmd_vel_teleop', 10)
-
     speed = 0.5
     turn = 0.5
-    
+    x = 0
+    th = 0
+    status = 0
+
     try:
         print(msg)
-        print("Raw Control Mode Active (No Ramping)")
-        tty.setraw(sys.stdin.fileno())
-
+        print(f"currently:\tspeed {speed}\tturn {turn}")
+        
         while True:
+            tty.setraw(sys.stdin.fileno())
             rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+            
             if rlist:
                 key = sys.stdin.read(1)
+                
                 if key in moveBindings:
-                    x, y, z, th = moveBindings[key]
-                    
-                    # CHANGE 3: Create Stamped Message
-                    t = TwistStamped()
-                    t.header.stamp = node.get_clock().now().to_msg()
-                    t.header.frame_id = "base_footprint"  # Valid Frame ID
-                    
-                    # Store velocity in the .twist sub-field
-                    t.twist.linear.x = float(x * speed)
-                    t.twist.angular.z = float(th * turn)
-                    
-                    pub.publish(t)
+                    x = moveBindings[key][0]
+                    th = moveBindings[key][3]
+                    teleop.publish_twist(x, th, speed, turn)
                     
                 elif key in speedBindings:
                     speed = speed * speedBindings[key][0]
                     turn = turn * speedBindings[key][1]
-                    print(f"currently:\tspeed {speed}\tturn {turn}\r")
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, teleop.settings)
+                    print(f"currently:\tspeed {speed:.2f}\tturn {turn:.2f}\r")
+                    tty.setraw(sys.stdin.fileno())
                     
-                elif key == 'x' or key == '\x03': # Stop or Ctrl-C
-                    # CHANGE 4: Stop with a valid stamped message
-                    stop_msg = TwistStamped()
-                    stop_msg.header.stamp = node.get_clock().now().to_msg()
-                    stop_msg.header.frame_id = "base_footprint"
-                    pub.publish(stop_msg)
-                    if key == '\x03': break
+                elif key == 'x':
+                    x = 0
+                    th = 0
+                    teleop.publish_twist(x, th, speed, turn)
+                    
+                elif key == '\x03': # CTRL-C
+                    break
             else:
                 pass
 
+    except Exception as e:
+        print(e)
+        
     finally:
-        # Final stop
-        stop_msg = TwistStamped()
-        stop_msg.header.frame_id = "base_footprint"
-        pub.publish(stop_msg)
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+        teleop.publish_twist(0, 0, speed, turn)
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, teleop.settings)
+        rclpy.shutdown()
 
 if __name__ == '__main__':
-    main() 
+    main()
