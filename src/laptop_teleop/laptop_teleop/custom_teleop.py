@@ -8,7 +8,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
 
 msg = """
-Control Your Rover! (CORRECTED BINDINGS)
+Control Your Rover! (STANDARD +1 BINDINGS)
 ---------------------------
 Moving around:
         w
@@ -25,6 +25,11 @@ d : turn right
 CTRL-C to quit
 """
 
+# START WITH STANDARD BINDINGS
+# w: x=1 (Forward)
+# s: x=-1 (Backward)
+# a: th=1 (Turn Left)
+# d: th=-1 (Turn Right) 
 moveBindings = {
     'w': (1, 0, 0, 0),
     's': (-1, 0, 0, 0),
@@ -56,7 +61,7 @@ def main():
     teleop = TeleopNode()
     
     speed = 0.5
-    turn = 0.5
+    turn = 1.0 # Higher turn speed for better response
     x = 0
     th = 0
     status = 0
@@ -66,6 +71,7 @@ def main():
         print(f"currently:\tspeed {speed}\tturn {turn}")
         
         while True:
+            # Check for key press without blocking
             tty.setraw(sys.stdin.fileno())
             rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
             
@@ -81,7 +87,8 @@ def main():
                     speed = speed * speedBindings[key][0]
                     turn = turn * speedBindings[key][1]
                     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, teleop.settings)
-                    print(f"currently:\tspeed {speed:.2f}\tturn {turn:.2f}\r")
+                    # Print status properly (escaping raw mode temporarily)
+                    print(f"currently:\tspeed {speed:.2f}\tturn {turn:.2f}")
                     tty.setraw(sys.stdin.fileno())
                     
                 elif key == 'x':
@@ -98,6 +105,7 @@ def main():
         print(e)
         
     finally:
+        # Publish Stop
         teleop.publish_twist(0, 0, speed, turn)
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, teleop.settings)
         rclpy.shutdown()
